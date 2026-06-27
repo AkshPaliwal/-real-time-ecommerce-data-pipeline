@@ -1,314 +1,176 @@
 <div align="center">
 
-# 🛒 Real-Time E-Commerce Analytics Platform
+# ⚡ Real-Time E-Commerce Analytics
 
-**A production-grade data engineering project simulating real-time e-commerce event processing**
-*Built to mirror architectures used at Flipkart, Swiggy, and Zomato*
+**Production-grade data pipeline · Built like Flipkart & Swiggy do it**
 
-[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Apache Kafka](https://img.shields.io/badge/Apache%20Kafka-3.x-231F20?style=for-the-badge&logo=apachekafka&logoColor=white)](https://kafka.apache.org)
-[![Apache Airflow](https://img.shields.io/badge/Apache%20Airflow-2.8.1-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white)](https://airflow.apache.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
-[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
-[![Metabase](https://img.shields.io/badge/Metabase-Latest-509EE3?style=for-the-badge&logo=metabase&logoColor=white)](https://metabase.com)
+[![Python](https://img.shields.io/badge/Python-3.10-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.138-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://reactjs.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Kafka](https://img.shields.io/badge/Apache_Kafka-3.x-231F20?style=flat-square&logo=apachekafka&logoColor=white)](https://kafka.apache.org)
+[![Airflow](https://img.shields.io/badge/Apache_Airflow-2.8-017CEE?style=flat-square&logo=apacheairflow&logoColor=white)](https://airflow.apache.org)
 
 </div>
 
 ---
 
-## 📌 Overview
-
-This project implements a **fully containerized, end-to-end data engineering pipeline** that ingests, validates, transforms, and visualizes e-commerce events in near-real-time. It demonstrates industry-standard patterns including event-driven architecture, medallion data layers, automated orchestration, and BI dashboarding — all running locally via Docker.
-
-**What makes this production-grade:**
-- Events flow from producer → Kafka → validated consumer → PostgreSQL in under 2 seconds
-- Bad data is automatically quarantined to a rejection log, never corrupting the warehouse
-- Six Airflow DAGs run nightly analytics autonomously — no manual triggers needed
-- A Metabase dashboard gives business stakeholders live visibility into the Gold data layer
-
----
-
-## 📐 Architecture
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        DATA INGESTION                           │
-│                                                                 │
-│   Kafka Producer (Python)                                       │
-│          │  Simulates orders, payments & delivery events        │
-│          ▼                                                      │
-│     Apache Kafka                                                │
-│   ┌──────────────────────────────────────┐                     │
-│   │  Topic: orders  │  Topic: payments   │  Topic: deliveries  │
-│   └──────────────────────────────────────┘                     │
-│          │                                                      │
-│          ▼                                                      │
-│   Kafka Consumer (Validated)                                    │
-│          │                                                      │
-│    ┌─────┴───────────┐                                         │
-│    ▼                 ▼                                         │
-│  PostgreSQL    Rejection Log                                    │
-│  (Valid data)  (Invalid records)                               │
-└─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    MEDALLION ARCHITECTURE                       │
-│                                                                 │
-│   🥉 Bronze Layer          🥈 Silver Layer       🥇 Gold Layer  │
-│   Raw ingested data   →   Cleaned & joined   →  Aggregated BI  │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATION & ANALYTICS                    │
-│                                                                 │
-│             Apache Airflow (6 Automated DAGs)                  │
-│     Daily Sales │ Quality Checks │ Customer Segmentation       │
-│     Revenue Forecast │ Delivery Analysis │ Hourly Stats        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    BUSINESS INTELLIGENCE                        │
-│                                                                 │
-│           Metabase Live Dashboards                              │
-│   Revenue by City │ Orders by Category │ Payment Methods       │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+Kafka Producer ──► Apache Kafka ──► Kafka Consumer
+  (Python)         3 Topics          (Validated)
+                                          │
+                                    PostgreSQL
+                                  Bronze/Silver/Gold
+                                          │
+                                   Apache Airflow
+                                    6 DAGs nightly
+                                          │
+                              ┌───────────┴───────────┐
+                           FastAPI                  React
+                         10 endpoints            Dashboard
+                       (REST + Analytics)      (Recharts UI)
 ```
 
 ---
 
-## 🛠️ Tech Stack
+## Stack
 
-| Tool | Version | Role |
-|------|---------|------|
-| **Apache Kafka** | 7.4.0 (Confluent) | Real-time event streaming across 3 topics |
-| **Apache Airflow** | 2.8.1 | Pipeline orchestration & DAG scheduling |
-| **PostgreSQL** | 15 | Data warehouse (Bronze / Silver / Gold layers) |
-| **Metabase** | Latest | Self-serve BI dashboards for stakeholders |
-| **Docker Compose** | — | Single-command service containerization |
-| **Python** | 3.10 | Event generation, validation, and processing |
-
----
-
-## ✨ Key Features
-
-| Feature | Description |
-|---------|-------------|
-| ⚡ **Real-Time Streaming** | Events processed every 2 seconds via Kafka across 3 topics |
-| ✅ **Automated Validation** | Invalid records quarantined to a rejection log automatically |
-| 🏗️ **Medallion Architecture** | Bronze → Silver → Gold data layers enforcing progressive quality |
-| 🤖 **6 Airflow DAGs** | Nightly analytics pipelines running without manual intervention |
-| 👥 **RFM Segmentation** | Customers ranked by Recency, Frequency, and Monetary value |
-| 📈 **Revenue Forecasting** | Moving average model predicts next-day revenue |
-| 🚚 **Delivery SLA Tracking** | City-wise on-time delivery performance breakdown |
-| 📊 **Live BI Dashboards** | Metabase reads from Gold layer for always-fresh visualizations |
-| 🇮🇳 **India-Specific Data** | UPI payments, Indian cities, local product categories simulated |
+| Layer | Tool | Purpose |
+|---|---|---|
+| Streaming | Apache Kafka | Real-time event ingestion |
+| Storage | PostgreSQL 15 | Bronze → Silver → Gold layers |
+| Orchestration | Apache Airflow | 6 automated nightly DAGs |
+| Backend | FastAPI | 10 REST + analytics endpoints |
+| Frontend | React + Recharts | Live dashboard with filters |
+| Infra | Docker Compose | One-command local setup |
 
 ---
 
-## 📁 Project Structure
+## Dashboard Features
 
 ```
-ecom-analytics-platform/
-│
-├── docker-compose.yml              # All 5 services: Kafka, Zookeeper, PostgreSQL,
-│                                   # Kafka UI, Metabase, pgAdmin
-│
-├── .env                            # Credentials & environment config (not committed)
-│
-├── dags/                           # Airflow DAG definitions
-│   ├── daily_sales_summary.py      # Revenue & order volume aggregation
-│   ├── data_quality_checks.py      # Null detection, duplicate flagging
-│   ├── hourly_stats.py             # Rolling hourly metrics snapshot
-│   ├── customer_segmentation_dag.py  # RFM analysis → customer tiers
-│   ├── revenue_forecasting_dag.py  # Moving average next-day forecast
-│   └── delivery_analysis_dag.py   # City-wise delivery SLA tracking
-│
-├── scripts/
-│   ├── kafka_producer.py           # Simulates 1,000+ events/min across 3 topics
-│   └── kafka_consumer_validated.py # Validates events; routes to DB or rejection log
-│
-└── sql/
-    └── schema.sql                  # Full DDL: Bronze, Silver, Gold layer tables
+📦 KPI Cards         — Orders · Revenue · Customers · AOV
+📈 Revenue Trend     — Monthly gradient line chart
+🥧 Order Status      — Donut breakdown
+🏙️  Revenue by City   — Multi-color bar chart
+🔮 Sales Forecast    — Linear regression · Next 7 days
+📊 Category Demand   — Growth % with rising/falling badges
+👤 Customer Churn    — Active / At Risk / Churned segmentation
+⚠️  Inventory Alerts  — Demand velocity + risk scoring
 ```
 
----
-
-## 🚀 Setup & Run
-
-### Prerequisites
-
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (running)
-- [Python 3.10](https://www.python.org/downloads/) via Conda
-- 8 GB RAM recommended for all containers
+**Filters:** City · Category · Date (7d / 30d / 90d / Custom) — applied across all charts
 
 ---
 
-### Step 1 — Clone & Start Services
+## API Endpoints
+
+```
+GET /api/dashboard/summary              KPIs
+GET /api/dashboard/revenue-by-city      City revenue
+GET /api/dashboard/category-sales       Category breakdown
+GET /api/dashboard/order-status         Status distribution
+GET /api/dashboard/monthly-revenue      Month-over-month trend
+GET /api/dashboard/top-products         Top 10 by revenue
+GET /api/dashboard/sales-prediction     7-day forecast
+GET /api/dashboard/category-forecast    Category growth %
+GET /api/dashboard/inventory-alert      High-demand products
+GET /api/dashboard/customer-churn       RFM churn segments
+```
+
+All endpoints accept `?city=&category=&date_from=&date_to=` query params.
+
+---
+
+## Airflow DAGs
+
+| DAG | Schedule | Job |
+|---|---|---|
+| `daily_sales_summary` | 1 AM | Revenue & order aggregation |
+| `data_quality_checks` | 2 AM | Null checks, duplicate detection |
+| `hourly_stats` | Every hour | Real-time metrics snapshot |
+| `customer_segmentation` | 3 AM | RFM analysis |
+| `revenue_forecasting` | 4 AM | Next-day prediction |
+| `delivery_time_analysis` | 5 AM | City-wise SLA tracking |
+
+---
+
+## Local Setup
+
+**Prerequisites:** Docker Desktop · Python 3.10 · Node 18+
 
 ```bash
-git clone https://github.com/akshpaliwal/ecom-analytics-platform.git
-cd ecom-analytics-platform
+# 1. Clone
+git clone https://github.com/AkshPaliwal/-real-time-ecommerce-data-pipeline.git
+cd real-time-ecommerce-data-pipeline
+
+# 2. Start Kafka + PostgreSQL
 docker compose up -d
+
+# 3. Start data pipeline
+python scripts/kafka_producer.py        # Terminal 1
+python scripts/kafka_consumer_validated.py  # Terminal 2
+
+# 4. Start FastAPI backend
+cd backend && uvicorn app.main:app --reload --port 8000
+
+# 5. Start React frontend
+cd frontend && npm install && npm start  # Opens on :3001
 ```
 
-> All services (Kafka, Zookeeper, PostgreSQL, Metabase, Kafka UI, pgAdmin) start via Docker Compose. Wait ~60 seconds for Kafka to be fully ready before starting the producer.
+**Service URLs**
+
+| Service | URL |
+|---|---|
+| React Dashboard | http://localhost:3001 |
+| FastAPI Docs | http://localhost:8000/docs |
+| Airflow | http://localhost:8081 |
+| Kafka UI | http://localhost:8090 |
+| pgAdmin | http://localhost:5050 |
 
 ---
 
-### Step 2 — Start Airflow
-
-Open two separate terminals:
-
-```bash
-# Activate the environment (both terminals)
-conda activate airflow-py310
-export AIRFLOW_HOME=~/airflow
-export AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://ecom_user:ecom_pass123@localhost:5432/ecom_analytics
-export AIRFLOW__CORE__EXECUTOR=LocalExecutor
-
-# Terminal 1 — Webserver
-airflow webserver --port 8081
-
-# Terminal 2 — Scheduler
-airflow scheduler
-```
-
-Navigate to [http://localhost:8081](http://localhost:8081) (admin / admin) to verify all 6 DAGs appear.
-
----
-
-### Step 3 — Start the Data Pipeline
-
-Open two more terminals:
-
-```bash
-# Terminal 3 — Start event producer
-python scripts/kafka_producer.py
-
-# Terminal 4 — Start validated consumer
-python scripts/kafka_consumer_validated.py
-```
-
-You should see events flowing in the Kafka UI at [http://localhost:8090](http://localhost:8090) and records appearing in PostgreSQL within seconds.
-
----
-
-## 🌐 Service URLs
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| **Airflow** | http://localhost:8081 | `admin` / `admin` |
-| **Metabase** | http://localhost:3000 | Create on first run |
-| **Kafka UI** | http://localhost:8090 | — |
-| **pgAdmin** | http://localhost:5050 | `admin@ecom.local` / `admin123` |
-
----
-
-## ⚙️ Airflow DAGs
-
-| DAG | Schedule | What It Does |
-|-----|----------|--------------|
-| `daily_sales_summary` | 1 AM daily | Aggregates total revenue, orders, and AOV by city and category |
-| `data_quality_checks` | 2 AM daily | Flags nulls, duplicates, and schema drift in Silver tables |
-| `hourly_stats` | Every hour | Snapshots rolling metrics for live dashboard freshness |
-| `customer_segmentation` | 3 AM daily | Scores all customers via RFM; writes segments to Gold layer |
-| `revenue_forecasting` | 4 AM daily | Computes 7-day moving average; forecasts next-day revenue |
-| `delivery_time_analysis` | 5 AM daily | Calculates city-wise delivery time and SLA breach rates |
-
----
-
-## 🥇 Medallion Data Architecture
+## Data Flow
 
 ```
-Bronze (Raw)          Silver (Cleaned)          Gold (Aggregated)
-─────────────         ────────────────          ─────────────────
-orders_raw       →    orders_validated     →    daily_sales_summary
-payments_raw     →    payments_validated   →    customer_segments
-deliveries_raw   →    delivery_events      →    city_delivery_sla
-                                           →    revenue_forecast
+1. Producer streams Indian e-commerce events every 2s
+   └── Orders · Payments · Deliveries across 3 Kafka topics
+
+2. Consumer validates records
+   └── Valid  ──► PostgreSQL (Bronze layer)
+   └── Invalid ──► Rejection log
+
+3. Airflow DAGs promote & aggregate nightly
+   └── Bronze ──► Silver ──► Gold
+
+4. FastAPI reads from Gold layer
+   └── 10 endpoints with city / category / date filters
+
+5. React dashboard polls every 30s
+   └── Live charts · KPIs · Forecasts · Alerts
 ```
 
-- **Bronze** — Raw events exactly as consumed from Kafka; no transformations
-- **Silver** — Validated, deduplicated, and joined records; typed columns
-- **Gold** — Business-ready aggregations consumed directly by Metabase
-
 ---
 
-## 📊 Metabase Dashboards
-
-After connecting Metabase to PostgreSQL (Gold schema), the following dashboards are available:
-
-- 📍 **Revenue by City** — Which Indian cities generate the most GMV
-- 📦 **Orders by Product Category** — Top-selling categories by volume and value
-- 💳 **Payment Method Breakdown** — UPI vs COD vs Card share over time
-- ⏱️ **Delivery Time Heatmap** — City-wise average delivery time vs SLA target
-
----
-
-## 📈 Project Metrics
+## Key Numbers
 
 | Metric | Value |
-|--------|-------|
-| Throughput | 1,000+ events per minute |
-| Kafka Topics | 3 (orders, payments, deliveries) |
-| Airflow DAGs | 6 automated pipelines |
-| PostgreSQL Tables | 10+ across 3 layers |
-| Analytics Models | RFM Segmentation, Moving Average Forecast |
-| Containerized Services | 6 (Kafka, Zookeeper, PostgreSQL, Metabase, Kafka UI, pgAdmin) |
-
----
-
-## 🧠 Concepts Demonstrated
-
-- **Stream processing** — Apache Kafka for real-time, high-throughput event ingestion
-- **Pipeline orchestration** — Airflow DAGs with dependency management and retry logic
-- **Medallion architecture** — Progressive data quality enforcement across Bronze/Silver/Gold
-- **Data quality monitoring** — Automated null detection, deduplication, and schema validation
-- **Customer analytics** — RFM-based segmentation to identify high-value customers
-- **Time-series forecasting** — Rolling moving average for next-day revenue prediction
-- **Containerized services** — Docker Compose for reproducible, single-command deployments
-- **Business intelligence** — Metabase connecting directly to the Gold layer for live dashboards
-
----
-
-## 🔄 End-to-End Data Flow
-
-```
-1. Producer  →  Generates synthetic Indian e-commerce events (UPI, Indian cities,
-                real product categories) at 1,000+ events/minute
-
-2. Kafka     →  Routes events across 3 partitioned topics for parallel consumption
-
-3. Consumer  →  Validates schema & types; writes clean records to PostgreSQL Bronze;
-                sends invalid records to rejection log
-
-4. Airflow   →  Nightly DAGs transform Bronze → Silver → Gold, run quality checks,
-                compute RFM segments, and generate revenue forecasts
-
-5. Metabase  →  Reads from Gold layer and serves live dashboards with no ETL delay
-```
-
----
-
-## 👤 Author
-
-**Aksh Paliwal**
-Aspiring Data Engineer — open to full-time opportunities and internships
-
-[![GitHub](https://img.shields.io/badge/GitHub-akshpaliwal-181717?style=flat-square&logo=github)](https://github.com/akshpaliwal)
+|---|---|
+| Events processed | 1,000+ / minute |
+| Kafka topics | 3 |
+| PostgreSQL tables | 10+ |
+| Airflow DAGs | 6 |
+| API endpoints | 10 |
+| Dashboard charts | 12 |
 
 ---
 
 <div align="center">
 
-⭐ **Found this useful? Star the repo to help others discover it.**
+**Aksh Paliwal** · Aspiring Data Engineer · [GitHub](https://github.com/AkshPaliwal)
 
-*Built with Apache Kafka · Apache Airflow · PostgreSQL · Metabase · Docker*
+*Built to mirror production architectures at Flipkart, Swiggy & Zomato*
 
 </div>
