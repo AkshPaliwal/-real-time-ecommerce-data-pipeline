@@ -1,0 +1,603 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
+} from 'recharts';
+
+// ─── Palette ─────────────────────────────────────────────────────────────────
+const C = {
+  bg:       '#04060f',
+  surface:  '#080d1a',
+  card:     '#0c1220',
+  border:   'rgba(255,255,255,0.06)',
+  borderHi: 'rgba(255,255,255,0.12)',
+  violet:   '#7c3aed',
+  cyan:     '#06b6d4',
+  emerald:  '#10b981',
+  amber:    '#f59e0b',
+  rose:     '#f43f5e',
+  indigo:   '#6366f1',
+  text:     '#e2e8f0',
+  muted:    '#64748b',
+  dim:      '#1e2d40',
+};
+
+const PIE_COLORS  = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#f43f5e','#6366f1','#ec4899'];
+const CITY_COLORS = ['#7c3aed','#6366f1','#06b6d4','#0ea5e9','#10b981','#34d399','#f59e0b','#fbbf24','#f43f5e','#fb7185'];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const inr = (n) => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+const inrCr = (n) => {
+  if (n >= 1e7) return '₹' + (n / 1e7).toFixed(2) + ' Cr';
+  if (n >= 1e5) return '₹' + (n / 1e5).toFixed(1) + 'L';
+  return inr(n);
+};
+
+// ─── Tooltip styles ──────────────────────────────────────────────────────────
+const ttStyle = {
+  background: '#0c1220',
+  border: '1px solid rgba(124,58,237,0.4)',
+  borderRadius: 10,
+  color: '#e2e8f0',
+  fontSize: 12,
+  boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INLINE CSS
+// ═══════════════════════════════════════════════════════════════════════════════
+const globalCSS = `
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: #04060f;
+  color: #e2e8f0;
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -40%;
+  left: -20%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: -30%;
+  right: -10%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(6,182,212,0.06) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #04060f; }
+::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 3px; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(16,185,129,0.6); }
+  50% { opacity: 0.7; box-shadow: 0 0 0 6px rgba(16,185,129,0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+`;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMPONENTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function LiveBadge({ lastUpdated, refreshIn }) {
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:16 }}>
+      <div style={{
+        display:'flex', alignItems:'center', gap:8,
+        background:'rgba(16,185,129,0.08)',
+        border:'1px solid rgba(16,185,129,0.25)',
+        borderRadius:20, padding:'6px 14px',
+        fontSize:12, fontWeight:600, color:C.emerald,
+      }}>
+        <span style={{
+          width:8, height:8, background:C.emerald, borderRadius:'50%',
+          animation:'pulse-dot 1.5s infinite', display:'inline-block'
+        }}/>
+        LIVE
+      </div>
+      <div style={{ textAlign:'right' }}>
+        <div style={{ color:C.muted, fontSize:11 }}>
+          Refreshes in <span style={{ color:C.cyan, fontWeight:600 }}>{refreshIn}s</span>
+        </div>
+        {lastUpdated && (
+          <div style={{ color:'#334155', fontSize:10, marginTop:2 }}>
+            Updated {lastUpdated}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KPICard({ icon, label, value, sub, color, delay }) {
+  const gradients = {
+    violet: 'linear-gradient(135deg, #7c3aed, #6366f1)',
+    cyan:   'linear-gradient(135deg, #06b6d4, #0ea5e9)',
+    emerald:'linear-gradient(135deg, #10b981, #34d399)',
+    amber:  'linear-gradient(135deg, #f59e0b, #fbbf24)',
+  };
+  const glows = {
+    violet: 'rgba(124,58,237,0.15)',
+    cyan:   'rgba(6,182,212,0.15)',
+    emerald:'rgba(16,185,129,0.15)',
+    amber:  'rgba(245,158,11,0.15)',
+  };
+  return (
+    <div style={{
+      background: C.card,
+      borderRadius: 18,
+      padding: '22px 24px',
+      border: `1px solid ${C.border}`,
+      position: 'relative',
+      overflow: 'hidden',
+      animation: `fadeUp 0.5s ease ${delay}s both`,
+      cursor: 'default',
+      transition: 'transform 0.2s, border-color 0.2s, box-shadow 0.2s',
+    }}
+    onMouseEnter={e => {
+      e.currentTarget.style.transform = 'translateY(-4px)';
+      e.currentTarget.style.borderColor = C.borderHi;
+      e.currentTarget.style.boxShadow = `0 20px 60px ${glows[color]}`;
+    }}
+    onMouseLeave={e => {
+      e.currentTarget.style.transform = 'translateY(0)';
+      e.currentTarget.style.borderColor = C.border;
+      e.currentTarget.style.boxShadow = 'none';
+    }}>
+      {/* Top gradient bar */}
+      <div style={{
+        position:'absolute', top:0, left:0, right:0, height:2,
+        background: gradients[color],
+      }}/>
+      {/* Glow orb */}
+      <div style={{
+        position:'absolute', top:-20, right:-20,
+        width:80, height:80,
+        background: glows[color],
+        borderRadius:'50%', filter:'blur(20px)',
+      }}/>
+      <div style={{ fontSize:26, marginBottom:12 }}>{icon}</div>
+      <div style={{ color:C.muted, fontSize:11, fontWeight:600, letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:6 }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize:28, fontWeight:800, color:'#f8fafc', lineHeight:1,
+        fontFamily:'Space Grotesk, sans-serif',
+        background: gradients[color],
+        WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+      }}>
+        {value}
+      </div>
+      {sub && <div style={{ color:C.emerald, fontSize:11, marginTop:8, fontWeight:500 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function Card({ title, badge, children, style = {} }) {
+  return (
+    <div style={{
+      background: C.card,
+      borderRadius: 18,
+      padding: '22px 24px',
+      border: `1px solid ${C.border}`,
+      transition: 'border-color 0.2s',
+      ...style,
+    }}
+    onMouseEnter={e => e.currentTarget.style.borderColor = C.borderHi}
+    onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:C.muted, textTransform:'uppercase', letterSpacing:'1px' }}>
+          {title}
+        </div>
+        {badge && (
+          <div style={{
+            background:'rgba(124,58,237,0.12)', color:'#a78bfa',
+            fontSize:11, padding:'3px 10px', borderRadius:20, fontWeight:600,
+            border:'1px solid rgba(124,58,237,0.2)',
+          }}>
+            {badge}
+          </div>
+        )}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function FilterBar({ cities, categories, filters, setFilters }) {
+  const sel = (key, val) => setFilters(f => ({ ...f, [key]: val }));
+  const active = filters.city !== 'all' || filters.category !== 'all';
+
+  return (
+    <div style={{
+      display:'flex', gap:10, alignItems:'center', flexWrap:'wrap',
+      marginBottom:24,
+      background: C.card,
+      border: `1px solid ${active ? 'rgba(124,58,237,0.3)' : C.border}`,
+      borderRadius:14, padding:'14px 18px',
+      transition:'border-color 0.2s',
+    }}>
+      <span style={{ color:C.muted, fontSize:12, fontWeight:600, marginRight:4 }}>🔍 FILTER</span>
+
+      {[
+        { key:'city', label:'City', opts: ['all', ...cities], display: v => v === 'all' ? 'All Cities' : v },
+        { key:'category', label:'Category', opts: ['all', ...categories], display: v => v === 'all' ? 'All Categories' : v },
+      ].map(({ key, opts, display }) => (
+        <select key={key}
+          value={filters[key]}
+          onChange={e => sel(key, e.target.value)}
+          style={{
+            background:'rgba(15,23,42,0.9)',
+            border:`1px solid ${filters[key] !== 'all' ? 'rgba(124,58,237,0.5)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius:9, color: filters[key] !== 'all' ? '#a78bfa' : C.text,
+            padding:'7px 14px', fontSize:13, cursor:'pointer', outline:'none',
+            fontFamily:'Inter, sans-serif', fontWeight: filters[key] !== 'all' ? 600 : 400,
+          }}>
+          {opts.map(o => <option key={o} value={o}>{display(o)}</option>)}
+        </select>
+      ))}
+
+      {active && (
+        <button onClick={() => setFilters({ city:'all', category:'all' })}
+          style={{
+            background:'rgba(244,63,94,0.1)',
+            border:'1px solid rgba(244,63,94,0.3)',
+            borderRadius:9, color:'#f43f5e',
+            padding:'7px 14px', fontSize:12, cursor:'pointer',
+            fontFamily:'Inter, sans-serif', fontWeight:600,
+            transition:'background 0.2s',
+          }}>
+          ✕ Reset
+        </button>
+      )}
+
+      <div style={{ marginLeft:'auto', color:C.muted, fontSize:11 }}>
+        {active ? <span style={{ color:'#a78bfa' }}>Filters active</span> : 'Showing all data'}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [data, setData]         = useState({});
+  const [loading, setLoading]   = useState(true);
+  const [filters, setFilters]   = useState({ city:'all', category:'all' });
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshIn, setRefreshIn]     = useState(30);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const [summary, city, cat, status, monthly, products] = await Promise.all([
+        fetch(`${API}/summary`).then(r => r.json()),
+        fetch(`${API}/revenue-by-city`).then(r => r.json()),
+        fetch(`${API}/category-sales`).then(r => r.json()),
+        fetch(`${API}/order-status`).then(r => r.json()),
+        fetch(`${API}/monthly-revenue`).then(r => r.json()),
+        fetch(`${API}/top-products`).then(r => r.json()),
+      ]);
+      setData({ summary, city, cat, status, monthly, products });
+      setLastUpdated(new Date().toLocaleTimeString());
+      setRefreshIn(30);
+    } catch (e) {
+      console.error('Fetch error:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    const interval = setInterval(fetchAll, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  // Countdown
+  useEffect(() => {
+    const tick = setInterval(() => setRefreshIn(r => r > 0 ? r - 1 : 30), 1000);
+    return () => tick;
+  }, []);
+
+  // Derived / filtered data
+  const cityData = (data.city || []).filter(d =>
+    filters.city === 'all' || d.city === filters.city
+  );
+  const catData = (data.cat || []).filter(d =>
+    filters.category === 'all' || d.category === filters.category
+  );
+  const allCities      = (data.city || []).map(d => d.city);
+  const allCategories  = (data.cat || []).map(d => d.category);
+  const productsData   = (data.products || []).filter(d =>
+    (filters.category === 'all' || d.product_name.toLowerCase().includes(filters.category.toLowerCase()))
+  );
+
+  if (loading) return (
+    <div style={{
+      display:'flex', alignItems:'center', justifyContent:'center',
+      height:'100vh', flexDirection:'column', gap:20,
+      background: C.bg,
+    }}>
+      <style>{globalCSS}</style>
+      <div style={{
+        width:48, height:48,
+        border:'3px solid rgba(124,58,237,0.2)',
+        borderTopColor:'#7c3aed',
+        borderRadius:'50%',
+        animation:'spin 0.8s linear infinite',
+      }}/>
+      <div style={{
+        fontFamily:'Space Grotesk, sans-serif',
+        fontSize:14, color:C.muted, letterSpacing:2,
+      }}>LOADING ANALYTICS...</div>
+    </div>
+  );
+
+  const s = data.summary || {};
+
+  return (
+    <>
+      <style>{globalCSS}</style>
+
+      {/* ── HEADER ─────────────────────────────────────────────────────── */}
+      <header style={{
+        position:'sticky', top:0, zIndex:100,
+        background:'rgba(4,6,15,0.85)',
+        backdropFilter:'blur(24px)',
+        borderBottom:'1px solid rgba(124,58,237,0.15)',
+        padding:'16px 32px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+      }}>
+        <div>
+          <div style={{
+            fontFamily:'Space Grotesk, sans-serif',
+            fontSize:20, fontWeight:700,
+            background:'linear-gradient(135deg, #a78bfa 0%, #06b6d4 50%, #10b981 100%)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
+          }}>
+            ⚡ E-Commerce Analytics
+          </div>
+          <div style={{ color:'#334155', fontSize:11, marginTop:2, letterSpacing:'0.5px' }}>
+            Kafka → PostgreSQL → FastAPI → React
+          </div>
+        </div>
+        <LiveBadge lastUpdated={lastUpdated} refreshIn={refreshIn} />
+      </header>
+
+      {/* ── MAIN ───────────────────────────────────────────────────────── */}
+      <main style={{ padding:'28px 32px', position:'relative', zIndex:1 }}>
+
+        {/* FILTERS */}
+        <FilterBar
+          cities={allCities}
+          categories={allCategories}
+          filters={filters}
+          setFilters={setFilters}
+        />
+
+        {/* KPI CARDS */}
+        <div style={{
+          display:'grid',
+          gridTemplateColumns:'repeat(4, 1fr)',
+          gap:20, marginBottom:24,
+        }}>
+          <KPICard icon="📦" label="Total Orders"     value={s.total_orders?.toLocaleString()}      color="violet" delay={0}    sub="All time" />
+          <KPICard icon="💰" label="Total Revenue"    value={inrCr(s.total_revenue)}                color="cyan"   delay={0.08} sub="Gross revenue" />
+          <KPICard icon="👥" label="Unique Customers" value={s.total_customers?.toLocaleString()}   color="emerald" delay={0.16} sub="Distinct buyers" />
+          <KPICard icon="🎯" label="Avg Order Value"  value={inrCr(s.average_order_value)}          color="amber"  delay={0.24} sub="Per transaction" />
+        </div>
+
+        {/* ROW 1 — Monthly Revenue + Order Status */}
+        <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:20, marginBottom:20 }}>
+
+          {/* Monthly Revenue Line Chart */}
+          <Card title="Monthly Revenue Trend" badge={`${(data.monthly||[]).length} months`}>
+            <ResponsiveContainer width="100%" height={260}>
+              <LineChart data={data.monthly || []}>
+                <defs>
+                  <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#7c3aed"/>
+                    <stop offset="100%" stopColor="#06b6d4"/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <XAxis dataKey="month" stroke={C.muted} tick={{ fontSize:11, fill:C.muted }} />
+                <YAxis stroke={C.muted} tick={{ fontSize:11, fill:C.muted }}
+                  tickFormatter={v => `₹${(v/1e5).toFixed(0)}L`} />
+                <Tooltip contentStyle={ttStyle}
+                  formatter={v => [inr(v), 'Revenue']}
+                  labelStyle={{ color:C.muted, marginBottom:4 }} />
+                <Line type="monotone" dataKey="revenue"
+                  stroke="url(#lineGrad)" strokeWidth={3}
+                  dot={{ fill:'#7c3aed', r:4, strokeWidth:0 }}
+                  activeDot={{ r:6, fill:'#a78bfa', strokeWidth:0 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Order Status Pie */}
+          <Card title="Orders by Status" badge={`${(data.status||[]).length} statuses`}>
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={data.status || []} dataKey="count" nameKey="status"
+                  cx="50%" cy="45%" outerRadius={90} innerRadius={50}
+                  paddingAngle={3}>
+                  {(data.status||[]).map((_, i) =>
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]}
+                      stroke="transparent" />
+                  )}
+                </Pie>
+                <Tooltip contentStyle={ttStyle}
+                  formatter={(v, n) => [v.toLocaleString(), n]} />
+                <Legend
+                  iconType="circle" iconSize={8}
+                  formatter={v => <span style={{ color:C.muted, fontSize:11 }}>{v}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+
+        {/* ROW 2 — Revenue by City + Category */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginBottom:20 }}>
+
+          {/* Revenue by City Bar */}
+          <Card title="Revenue by City" badge={`Top ${Math.min(cityData.length,10)}`}>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={cityData.slice(0,10)} barSize={22}>
+                <defs>
+                  {CITY_COLORS.map((c, i) => (
+                    <linearGradient key={i} id={`cg${i}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={c} stopOpacity={0.9}/>
+                      <stop offset="100%" stopColor={c} stopOpacity={0.4}/>
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis dataKey="city" stroke={C.muted} tick={{ fontSize:10, fill:C.muted }} />
+                <YAxis stroke={C.muted} tick={{ fontSize:11, fill:C.muted }}
+                  tickFormatter={v => `₹${(v/1e5).toFixed(0)}L`} />
+                <Tooltip contentStyle={ttStyle}
+                  formatter={v => [inr(v), 'Revenue']}
+                  cursor={{ fill:'rgba(255,255,255,0.03)' }} />
+                <Bar dataKey="revenue" radius={[6,6,0,0]}>
+                  {cityData.slice(0,10).map((_, i) =>
+                    <Cell key={i} fill={`url(#cg${i % CITY_COLORS.length})`} />
+                  )}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+
+          {/* Category Donut */}
+          <Card title="Revenue by Category" badge={`${catData.length} categories`}>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie data={catData} dataKey="sales" nameKey="category"
+                  cx="50%" cy="45%" outerRadius={100} innerRadius={55}
+                  paddingAngle={3}>
+                  {catData.map((_, i) =>
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]}
+                      stroke="transparent" />
+                  )}
+                </Pie>
+                <Tooltip contentStyle={ttStyle}
+                  formatter={v => [inr(v), 'Sales']} />
+                <Legend
+                  iconType="circle" iconSize={8}
+                  formatter={v => <span style={{ color:C.muted, fontSize:11 }}>{v}</span>}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+        </div>
+
+        {/* ROW 3 — Top Products Table */}
+        <Card title="Top 10 Products" badge="By Revenue">
+          <div style={{ overflowX:'auto' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom:`1px solid ${C.dim}` }}>
+                  {['#', 'Product', 'Qty Sold', 'Revenue', 'Share'].map(h => (
+                    <th key={h} style={{
+                      padding:'10px 14px', textAlign:'left',
+                      color:C.muted, fontSize:11, fontWeight:700,
+                      textTransform:'uppercase', letterSpacing:'0.6px',
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(productsData.slice(0,10)).map((row, i) => {
+                  const maxRev = productsData[0]?.total_revenue || 1;
+                  const pct = ((row.total_revenue / maxRev) * 100).toFixed(0);
+                  return (
+                    <tr key={i} style={{
+                      borderBottom:`1px solid rgba(255,255,255,0.03)`,
+                      transition:'background 0.15s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background='rgba(124,58,237,0.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                      <td style={{ padding:'13px 14px', color:C.muted, fontWeight:700, width:40 }}>
+                        {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}
+                      </td>
+                      <td style={{ padding:'13px 14px', color:C.text, fontSize:13, fontWeight:500 }}>
+                        {row.product_name}
+                      </td>
+                      <td style={{ padding:'13px 14px', color:C.muted, fontSize:13 }}>
+                        {row.total_quantity?.toLocaleString()}
+                      </td>
+                      <td style={{ padding:'13px 14px', color:C.emerald, fontWeight:700, fontSize:13 }}>
+                        {inr(row.total_revenue)}
+                      </td>
+                      <td style={{ padding:'13px 14px', minWidth:120 }}>
+                        <div style={{
+                          background:'rgba(255,255,255,0.05)',
+                          borderRadius:4, height:6, overflow:'hidden',
+                        }}>
+                          <div style={{
+                            height:'100%', borderRadius:4,
+                            width:`${pct}%`,
+                            background:'linear-gradient(90deg, #7c3aed, #06b6d4)',
+                            transition:'width 0.6s ease',
+                          }}/>
+                        </div>
+                        <div style={{ color:C.muted, fontSize:10, marginTop:3 }}>{pct}%</div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        {/* FOOTER */}
+        <div style={{
+          marginTop:32, textAlign:'center',
+          color:'#1e293b', fontSize:11, paddingBottom:24,
+        }}>
+          Built with Kafka · PostgreSQL · Apache Airflow · FastAPI · React
+        </div>
+      </main>
+    </>
+  );
+}
