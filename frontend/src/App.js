@@ -4,7 +4,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-const API = 'http://127.0.0.1:8000/api/dashboard';
+const API = 'https://real-time-ecommerce-data-pipeline-production.up.railway.app/api/dashboard';
 
 const PIE_COLORS  = ['#7c3aed','#06b6d4','#10b981','#f59e0b','#f43f5e','#6366f1','#ec4899'];
 const CITY_COLORS = ['#7c3aed','#6366f1','#06b6d4','#0ea5e9','#10b981','#34d399','#f59e0b','#fbbf24','#f43f5e','#fb7185'];
